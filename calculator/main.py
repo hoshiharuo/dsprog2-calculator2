@@ -35,7 +35,7 @@ class ExtraActionButton(CalcButton):
 class ScientificButton(CalcButton):
     def __init__(self, text, button_clicked):
         CalcButton.__init__(self, text, button_clicked)
-        self.bgcolor = ft.colors.GREEN
+        self.bgcolor = ft.colors.WHITE24
         self.color = ft.colors.WHITE
 
 
