@@ -1,7 +1,6 @@
 import flet as ft
 import requests
 
-# 天気コード対応表
 WEATHER_CODES = {
     "100": {"name": "晴れ", "icon": ft.icons.WB_SUNNY},
     "101": {"name": "晴れ 時々 くもり", "icon": ft.icons.CLOUD_QUEUE},
@@ -24,12 +23,9 @@ WEATHER_CODES = {
     "403": {"name": "雪 時々 雨", "icon": ft.icons.UMBRELLA},
     "405": {"name": "大雪", "icon": ft.icons.AC_UNIT},
 }
-
-# 天気情報を取得
 def get_weather_info(code):
     return WEATHER_CODES.get(code, {"name": "不明", "icon": ft.icons.HELP})
 
-# 地域データを取得する関数
 def get_region_data():
     URL = "http://www.jma.go.jp/bosai/common/const/area.json"
     try:
@@ -39,7 +35,6 @@ def get_region_data():
         print(f"地域データの取得エラー: {e}")
         return None
 
-# 天気データを取得する関数
 def get_weather_data(region_code):
     URL = f"https://www.jma.go.jp/bosai/forecast/data/forecast/{region_code}.json"
     try:
@@ -74,13 +69,13 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
                                 ft.Icon(
                                     weather_info["icon"],
                                     size=32,
-                                    color="#FF9800"  # オレンジ色のアイコン
+                                    color="#FF9800"  
                                 ),
-                                ft.Container(width=8),  # スペーサー
+                                ft.Container(width=8),  
                                 ft.Icon(
                                     ft.icons.CLOUD,
                                     size=28,
-                                    color="#78909C"  # グレー色の雲アイコン
+                                    color="#78909C"  
                                 ),
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
@@ -93,13 +88,13 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
                         color="#2B2B2B",
                         weight="w500"
                     ),
-                    ft.Container(height=8),  # スペーサー
+                    ft.Container(height=8),  
                     ft.Row(
                         [
                             ft.Text(
                                 f"{min_temp}°C",
                                 size=14,
-                                color="#1976D2",  # 青色
+                                color="#1976D2",  
                                 weight="bold"
                             ),
                             ft.Text(
@@ -110,7 +105,7 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
                             ft.Text(
                                 f"{max_temp}°C",
                                 size=14,
-                                color="#D32F2F",  # 赤色
+                                color="#D32F2F",  
                                 weight="bold"
                             ),
                         ],
@@ -127,22 +122,19 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
             bgcolor=ft.colors.WHITE,
             border_radius=16,
         ),
-        elevation=0,  # 影を無くす
+        elevation=0,  
     )
 
-# メイン関数
 def main(page: ft.Page):
     page.title = "天気予報アプリ"
     page.padding = 10
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # 地域データを取得
     region_data = get_region_data()
     if not region_data:
         page.add(ft.Text("地域データの取得に失敗しました"))
         return
 
-    # 天気表示エリア
     weather_grid = ft.GridView(
         expand=True,
         runs_count=3,
@@ -150,7 +142,6 @@ def main(page: ft.Page):
         run_spacing=10,
     )
 
-    # サイドバー作成
     def create_sidebar():
         sidebar = ft.Column(spacing=10)
         for region_code, region_info in region_data["centers"].items():
@@ -178,7 +169,6 @@ def main(page: ft.Page):
             sidebar.controls.append(region_tile)
         return sidebar
 
-    # 天気を表示
     def show_weather(region_code):
         weather_data = get_weather_data(region_code)
         if not weather_data or len(weather_data) < 2:
@@ -186,15 +176,12 @@ def main(page: ft.Page):
             page.update()
             return
 
-        # 週間予報のデータを使用
         forecasts = weather_data[1]["timeSeries"][0]
         dates = forecasts["timeDefines"]
         areas = forecasts["areas"]
-        
-        # 最初のエリアを使用
+
         area = areas[0]
-        
-        # 気温データの取得
+
         temp_data = weather_data[1]["timeSeries"][1]
         temp_area = temp_data["areas"][0]
 
@@ -215,7 +202,6 @@ def main(page: ft.Page):
         weather_grid.controls = cards
         page.update()
 
-    # 全体レイアウト
     sidebar_container = ft.Container(
         content=create_sidebar(),
         width=250,
