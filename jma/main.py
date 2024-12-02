@@ -7,10 +7,13 @@ WEATHER_CODES = {
     "101": {"name": "晴れ 時々 くもり", "icon": ft.icons.CLOUD_QUEUE},
     "103": {"name": "晴れ 時々 雨", "icon": ft.icons.UMBRELLA},
     "105": {"name": "晴れ 時々 雪", "icon": ft.icons.AC_UNIT},
+    "111": {"name": "晴れ のち くもり", "icon": ft.icons.CLOUD_QUEUE},
     "200": {"name": "くもり", "icon": ft.icons.CLOUD},
     "201": {"name": "くもり 時々 晴れ", "icon": ft.icons.WB_SUNNY},
     "203": {"name": "くもり 時々 雨", "icon": ft.icons.UMBRELLA},
     "205": {"name": "くもり 時々 雪", "icon": ft.icons.AC_UNIT},
+    "206": {"name": "くもり のち 雨", "icon": ft.icons.UMBRELLA},
+    "260": {"name": "くもり のち 時々 雨", "icon": ft.icons.UMBRELLA},
     "300": {"name": "雨", "icon": ft.icons.UMBRELLA},
     "301": {"name": "雨 時々 晴れ", "icon": ft.icons.WB_SUNNY},
     "303": {"name": "雨 時々 雪", "icon": ft.icons.AC_UNIT},
@@ -59,26 +62,79 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
         content=ft.Container(
             content=ft.Column(
                 [
-                    ft.Text(date, weight="bold", size=16),  # 日付
-                    ft.Icon(weather_info["icon"], size=40),  # 天気アイコン
-                    ft.Text(weather_info["name"], size=14),  # 天気名
-                    ft.Text(f"最高: {max_temp or '不明'}°C / 最低: {min_temp or '不明'}°C", size=12),
+                    ft.Text(
+                        date.split("-")[0] + "-" + date.split("-")[1] + "-" + date.split("-")[2],
+                        weight="bold",
+                        size=14,
+                        color="#2B2B2B"
+                    ),
+                    ft.Container(
+                        content=ft.Row(
+                            [
+                                ft.Icon(
+                                    weather_info["icon"],
+                                    size=32,
+                                    color="#FF9800"  # オレンジ色のアイコン
+                                ),
+                                ft.Container(width=8),  # スペーサー
+                                ft.Icon(
+                                    ft.icons.CLOUD,
+                                    size=28,
+                                    color="#78909C"  # グレー色の雲アイコン
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                        ),
+                        margin=ft.margin.symmetric(vertical=10),
+                    ),
+                    ft.Text(
+                        weather_info["name"],
+                        size=14,
+                        color="#2B2B2B",
+                        weight="w500"
+                    ),
+                    ft.Container(height=8),  # スペーサー
+                    ft.Row(
+                        [
+                            ft.Text(
+                                f"{min_temp}°C",
+                                size=14,
+                                color="#1976D2",  # 青色
+                                weight="bold"
+                            ),
+                            ft.Text(
+                                " / ",
+                                size=14,
+                                color="#757575",
+                            ),
+                            ft.Text(
+                                f"{max_temp}°C",
+                                size=14,
+                                color="#D32F2F",  # 赤色
+                                weight="bold"
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    ),
                 ],
-                alignment=ft.MainAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.START,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=4,
             ),
-            padding=10,
-            width=150,
-            height=200,
-            bgcolor="white",
-            border_radius=8,
-        )
+            padding=ft.padding.all(16),
+            width=140,
+            height=160,
+            bgcolor=ft.colors.WHITE,
+            border_radius=16,
+        ),
+        elevation=0,  # 影を無くす
     )
 
 # メイン関数
 def main(page: ft.Page):
     page.title = "天気予報アプリ"
     page.padding = 10
+    page.theme_mode = ft.ThemeMode.LIGHT
 
     # 地域データを取得
     region_data = get_region_data()
@@ -89,7 +145,7 @@ def main(page: ft.Page):
     # 天気表示エリア
     weather_grid = ft.GridView(
         expand=True,
-        runs_count=3,  # 1行のカード数
+        runs_count=3,
         spacing=10,
         run_spacing=10,
     )
@@ -99,14 +155,25 @@ def main(page: ft.Page):
         sidebar = ft.Column(spacing=10)
         for region_code, region_info in region_data["centers"].items():
             region_tile = ft.ExpansionTile(
-                title=ft.Text(region_info["name"]),
+                title=ft.Text(region_info["name"], color="white"),
                 controls=[
                     ft.ListTile(
-                        title=ft.Text(sub_region),  # サブ地域のコードを表示
+                        title=ft.Column([
+                            ft.Text(
+                                region_data["offices"].get(sub_region, {}).get("name", "不明"),
+                                color="white",
+                                size=16
+                            ),
+                            ft.Text(
+                                sub_region,
+                                color="white70",
+                                size=12
+                            )
+                        ], spacing=2),
                         on_click=lambda e, code=sub_region: show_weather(code)
                     )
                     for sub_region in region_info["children"]
-                ]
+                ],
             )
             sidebar.controls.append(region_tile)
         return sidebar
@@ -114,7 +181,7 @@ def main(page: ft.Page):
     # 天気を表示
     def show_weather(region_code):
         weather_data = get_weather_data(region_code)
-        if not weather_data or len(weather_data) < 2:  # 2つ目のデータセットを使用
+        if not weather_data or len(weather_data) < 2:
             weather_grid.controls = [ft.Text("天気データの取得に失敗しました")]
             page.update()
             return
@@ -123,11 +190,11 @@ def main(page: ft.Page):
         forecasts = weather_data[1]["timeSeries"][0]
         dates = forecasts["timeDefines"]
         areas = forecasts["areas"]
-    
+        
         # 最初のエリアを使用
         area = areas[0]
-    
-        # 気温データの取得（2つ目のtimeSeriesから）
+        
+        # 気温データの取得
         temp_data = weather_data[1]["timeSeries"][1]
         temp_area = temp_data["areas"][0]
 
@@ -135,7 +202,7 @@ def main(page: ft.Page):
         for i in range(len(dates)):
             max_temp = temp_area.get("tempsMax", [None])[i] if "tempsMax" in temp_area else None
             min_temp = temp_area.get("tempsMin", [None])[i] if "tempsMin" in temp_area else None
-        
+            
             cards.append(
                 create_weather_card(
                     date=dates[i].split("T")[0],
@@ -149,17 +216,18 @@ def main(page: ft.Page):
         page.update()
 
     # 全体レイアウト
-    sidebar = create_sidebar()
+    sidebar_container = ft.Container(
+        content=create_sidebar(),
+        width=250,
+        bgcolor="#455A64",
+        padding=10,
+        border_radius=10,
+    )
+
     page.add(
         ft.Row(
             [
-                ft.Container(
-                    content=sidebar,
-                    width=250,
-                    bgcolor="#607D8B",
-                    padding=10,
-                    border_radius=10,
-                ),
+                sidebar_container,
                 ft.VerticalDivider(width=1),
                 weather_grid,
             ],
