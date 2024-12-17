@@ -1,5 +1,6 @@
 import flet as ft
 import requests
+import sqlite3
 
 WEATHER_CODES = {
     "100": {"name": "晴れ", "icon": ft.icons.WB_SUNNY},
@@ -23,6 +24,7 @@ WEATHER_CODES = {
     "403": {"name": "雪 時々 雨", "icon": ft.icons.UMBRELLA},
     "405": {"name": "大雪", "icon": ft.icons.AC_UNIT},
 }
+
 def get_weather_info(code):
     return WEATHER_CODES.get(code, {"name": "不明", "icon": ft.icons.HELP})
 
@@ -130,12 +132,107 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
         elevation=0,  
     )
 
+# --- 変更ここから: DB初期化・格納用関数追加 ---
+def init_db():
+    conn = sqlite3.connect("weather.db")
+    c = conn.cursor()
+
+    # 地域テーブル
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS regions (
+        region_code TEXT PRIMARY KEY,
+        region_name TEXT
+    )
+    ''')
+
+    # 天気テーブル
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS forecasts (
+        region_code TEXT,
+        forecast_date TEXT,
+        weather_code TEXT,
+        min_temp REAL,
+        max_temp REAL,
+        PRIMARY KEY (region_code, forecast_date),
+        FOREIGN KEY (region_code) REFERENCES regions(region_code)
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+def store_region_data_in_db(region_data):
+    if not region_data:
+        return
+
+    conn = sqlite3.connect("weather.db")
+    c = conn.cursor()
+
+    # officesキーに地域コードと名前が入っている
+    for office_code, office_info in region_data["offices"].items():
+        region_code = office_code
+        region_name = office_info.get("name", "不明")
+        c.execute('''
+            INSERT OR IGNORE INTO regions (region_code, region_name)
+            VALUES (?, ?)
+        ''', (region_code, region_name))
+    conn.commit()
+    conn.close()
+
+def store_weather_data_in_db(region_code, weather_data):
+    if not weather_data or len(weather_data) < 2:
+        return
+    conn = sqlite3.connect("weather.db")
+    c = conn.cursor()
+
+    forecasts = weather_data[1]["timeSeries"][0]
+    dates = forecasts["timeDefines"]
+    areas = forecasts["areas"]
+    area = areas[0]
+
+    temp_data = weather_data[1]["timeSeries"][1]
+    temp_area = temp_data["areas"][0]
+
+    for i in range(len(dates)):
+        date = dates[i].split("T")[0]
+        weather_code = area["weatherCodes"][i]
+        min_temp = temp_area.get("tempsMin", [None])[i] if "tempsMin" in temp_area else None
+        max_temp = temp_area.get("tempsMax", [None])[i] if "tempsMax" in temp_area else None
+
+        c.execute('''
+            INSERT OR REPLACE INTO forecasts (region_code, forecast_date, weather_code, min_temp, max_temp)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (region_code, date, weather_code, min_temp, max_temp))
+
+    conn.commit()
+    conn.close()
+
+def get_forecasts_from_db(region_code):
+    conn = sqlite3.connect("weather.db")
+    c = conn.cursor()
+
+    c.execute('SELECT region_name FROM regions WHERE region_code = ?', (region_code,))
+    row = c.fetchone()
+    region_name = row[0] if row else "不明"
+
+    c.execute('SELECT forecast_date, weather_code, min_temp, max_temp FROM forecasts WHERE region_code = ? ORDER BY forecast_date', (region_code,))
+    forecasts = c.fetchall()
+    conn.close()
+
+    return region_name, forecasts
+# --- 変更ここまで ---
+
 def main(page: ft.Page):
     page.title = "天気予報アプリ"
     page.padding = 10
     page.theme_mode = ft.ThemeMode.LIGHT
 
+    # --- 変更ここから: DB初期化と地域データ投入 ---
+    init_db()
     region_data = get_region_data()
+    store_region_data_in_db(region_data)
+    # --- 変更ここまで ---
+
     if not region_data:
         page.add(ft.Text("地域データの取得に失敗しました"))
         return
@@ -169,7 +266,9 @@ def main(page: ft.Page):
                                 size=12
                             )
                         ], spacing=2),
-                        on_click=lambda e, code=sub_region: show_weather(code)
+                        # --- 変更ここから: show_weatherからshow_weather_dbへ変更 ---
+                        on_click=lambda e, code=sub_region: show_weather_from_db(code)
+                        # --- 変更ここまで ---
                     )
                     for sub_region in region_info["children"]
                 ],
@@ -177,37 +276,32 @@ def main(page: ft.Page):
             sidebar.controls.append(region_tile)
         return sidebar
 
-    def show_weather(region_code):
-        weather_data = get_weather_data(region_code)
-        if not weather_data or len(weather_data) < 2:
+    # --- 変更ここから: DBから表示する関数を追加 ---
+    def show_weather_from_db(region_code):
+        # DBにデータがなければAPIから取得しDB保存する
+        region_name, forecasts = get_forecasts_from_db(region_code)
+        if not forecasts:
+            # データなければ取得
+            weather_data = get_weather_data(region_code)
+            if weather_data:
+                store_weather_data_in_db(region_code, weather_data)
+                # 再取得
+                region_name, forecasts = get_forecasts_from_db(region_code)
+
+        if not forecasts:
             weather_grid.controls = [ft.Text("天気データの取得に失敗しました")]
-            # 地域名表示をクリア
             region_title.value = ""
             page.update()
             return
 
-        # 選択された地域名をregion_dataから取得
-        region_name = region_data["offices"].get(region_code, {}).get("name", "不明")
         region_title.value = region_name
 
-        forecasts = weather_data[1]["timeSeries"][0]
-        dates = forecasts["timeDefines"]
-        areas = forecasts["areas"]
-
-        area = areas[0]
-
-        temp_data = weather_data[1]["timeSeries"][1]
-        temp_area = temp_data["areas"][0]
-
         cards = []
-        for i in range(len(dates)):
-            max_temp = temp_area.get("tempsMax", [None])[i] if "tempsMax" in temp_area else None
-            min_temp = temp_area.get("tempsMin", [None])[i] if "tempsMin" in temp_area else None
-            
+        for (forecast_date, weather_code, min_temp, max_temp) in forecasts:
             cards.append(
                 create_weather_card(
-                    date=dates[i].split("T")[0],
-                    weather_code=area["weatherCodes"][i],
+                    date=forecast_date,
+                    weather_code=weather_code,
                     max_temp=max_temp,
                     min_temp=min_temp
                 )
@@ -215,6 +309,11 @@ def main(page: ft.Page):
 
         weather_grid.controls = cards
         page.update()
+    # --- 変更ここまで ---
+
+    # 既存のshow_weatherは不要になるが、必要ならコメントアウトまたは削除可能
+    # def show_weather(region_code):
+    #     ...
 
     sidebar_container = ft.Container(
         content=create_sidebar(),
