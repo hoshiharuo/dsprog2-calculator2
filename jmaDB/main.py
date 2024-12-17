@@ -44,7 +44,7 @@ def get_weather_data(region_code):
     try:
         response = requests.get(URL, headers=headers)
         response.raise_for_status()
-        weather_json = requests.get(URL).json()
+        weather_json = response.json()  # 修正: requests.get(URL)を2回呼んでいた
         return weather_json
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
@@ -173,32 +173,36 @@ def store_region_data_in_db(region_data):
     conn.close()
 
 def store_weather_data_in_db(region_code, weather_data):
-    if not weather_data or len(weather_data) < 2:
+    if not weather_data or len(weather_data) < 1:  # インデックスエラー対策
         return
     conn = sqlite3.connect("weather.db")
     c = conn.cursor()
 
-    forecasts = weather_data[1]["timeSeries"][0]
-    dates = forecasts["timeDefines"]
-    areas = forecasts["areas"]
-    area = areas[0]
+    try:
+        forecasts = weather_data[0]["timeSeries"][0]
+        dates = forecasts["timeDefines"]
+        areas = forecasts["areas"]
+        area = areas[0]
 
-    temp_data = weather_data[1]["timeSeries"][1]
-    temp_area = temp_data["areas"][0]
+        temp_data = weather_data[0]["timeSeries"][2]  # 気温データのインデックスを修正
+        temp_area = temp_data["areas"][0]
 
-    for i in range(len(dates)):
-        date = dates[i].split("T")[0]
-        weather_code = area["weatherCodes"][i]
-        min_temp = temp_area.get("tempsMin", [None])[i] if "tempsMin" in temp_area else None
-        max_temp = temp_area.get("tempsMax", [None])[i] if "tempsMax" in temp_area else None
+        for i in range(len(dates)):
+            date = dates[i].split("T")[0]
+            weather_code = area["weatherCodes"][i]
+            min_temp = temp_area.get("temps", [None])[i*2] if "temps" in temp_area else None
+            max_temp = temp_area.get("temps", [None])[i*2+1] if "temps" in temp_area else None
 
-        c.execute('''
-            INSERT OR REPLACE INTO forecasts (region_code, forecast_date, weather_code, min_temp, max_temp)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (region_code, date, weather_code, min_temp, max_temp))
+            c.execute('''
+                INSERT OR REPLACE INTO forecasts (region_code, forecast_date, weather_code, min_temp, max_temp)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (region_code, date, weather_code, min_temp, max_temp))
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    except Exception as e:
+        print(f"データベース保存エラー: {e}")
+    finally:
+        conn.close()
 
 def get_forecasts_from_db(region_code):
     conn = sqlite3.connect("weather.db")
@@ -276,10 +280,8 @@ def main(page: ft.Page):
         nonlocal selected_region_code, all_forecasts
         selected_region_code = region_code
 
-        # DBからデータ取得
         region_name, forecasts = get_forecasts_from_db(region_code)
 
-        # データが無ければAPIから取得してDB格納
         if not forecasts:
             weather_data = get_weather_data(region_code)
             if weather_data:
@@ -297,27 +299,19 @@ def main(page: ft.Page):
         region_title.value = region_name
         all_forecasts = forecasts
 
-        # 日付ドロップダウン更新
-        # forecastsは[(forecast_date, weather_code, min_temp, max_temp), ...]
         date_list = [f[0] for f in forecasts]
         date_dropdown.options = [ft.dropdown.Option(date) for date in date_list]
         date_dropdown.value = date_list[0] if date_list else None
 
-        # 初期表示用に最初の日付を表示
         show_selected_date_forecast()
 
     def show_selected_date_forecast():
         weather_grid.controls = []
-        if not date_dropdown.value or not all_forecasts:
-            page.update()
+        if not all_forecasts:
             return
-
-        # 選択された日付の予報を取得
-        selected_date = date_dropdown.value
-        selected_data = [f for f in all_forecasts if f[0] == selected_date]
-        # selected_dataは基本的に1つの日付につき1レコードだが、
-        # 将来的に複数レコードある場合も対応できるようループ
-        for forecast_date, weather_code, min_temp, max_temp in selected_data:
+    
+        for forecast in all_forecasts:
+            forecast_date, weather_code, min_temp, max_temp = forecast
             weather_grid.controls.append(
                 create_weather_card(
                     date=forecast_date,
@@ -326,8 +320,8 @@ def main(page: ft.Page):
                     min_temp=min_temp
                 )
             )
-
-        page.update()
+    
+    page.update()
 
     sidebar_container = ft.Container(
         content=create_sidebar(),
@@ -339,11 +333,28 @@ def main(page: ft.Page):
 
     right_area = ft.Column(
         [
-            region_title,   
-            weather_grid,   
+            region_title,
+            ft.Row(
+                [
+                    ft.Text("日付:", size=16),
+                    date_dropdown,
+                ],
+                alignment=ft.MainAxisAlignment.START,
+            ),
+            weather_grid,
         ],
+        spacing=20,
+        expand=True,
+        scroll=ft.ScrollMode.AUTO  
+    )
+
+    weather_grid = ft.GridView(
+        expand=True,
+        runs_count=5,  
+        max_extent=200,  
         spacing=10,
-        expand=True
+        run_spacing=10,
+        child_aspect_ratio=0.8,  
     )
 
     page.add(
