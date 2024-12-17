@@ -140,6 +140,9 @@ def main(page: ft.Page):
         page.add(ft.Text("地域データの取得に失敗しました"))
         return
 
+    # 地域名表示用テキスト
+    region_title = ft.Text("", size=20, weight="bold")
+
     weather_grid = ft.GridView(
         expand=True,
         runs_count=3,
@@ -148,7 +151,7 @@ def main(page: ft.Page):
     )
 
     def create_sidebar():
-        sidebar = ft.Column(spacing=10, scroll = ft.ScrollMode.AUTO)
+        sidebar = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
         for region_code, region_info in region_data["centers"].items():
             region_tile = ft.ExpansionTile(
                 title=ft.Text(region_info["name"], color="white"),
@@ -178,8 +181,14 @@ def main(page: ft.Page):
         weather_data = get_weather_data(region_code)
         if not weather_data or len(weather_data) < 2:
             weather_grid.controls = [ft.Text("天気データの取得に失敗しました")]
+            # 地域名表示をクリア
+            region_title.value = ""
             page.update()
             return
+
+        # 選択された地域名をregion_dataから取得
+        region_name = region_data["offices"].get(region_code, {}).get("name", "不明")
+        region_title.value = region_name
 
         forecasts = weather_data[1]["timeSeries"][0]
         dates = forecasts["timeDefines"]
@@ -215,12 +224,22 @@ def main(page: ft.Page):
         border_radius=10,
     )
 
+    # 右側の表示エリアに地域名と天気グリッドを縦に並べる
+    right_area = ft.Column(
+        [
+            region_title,   # 地域名表示
+            weather_grid,   # 天気カード表示エリア
+        ],
+        spacing=10,
+        expand=True
+    )
+
     page.add(
         ft.Row(
             [
                 sidebar_container,
                 ft.VerticalDivider(width=1),
-                weather_grid,
+                right_area,
             ],
             expand=True,
         )
