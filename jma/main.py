@@ -148,7 +148,7 @@ def main(page: ft.Page):
     )
 
     def create_sidebar():
-        sidebar = ft.Column(spacing=10)
+        sidebar = ft.Column(spacing=10, scroll = ft.ScrollMode.AUTO)
         for region_code, region_info in region_data["centers"].items():
             region_tile = ft.ExpansionTile(
                 title=ft.Text(region_info["name"], color="white"),
@@ -213,7 +213,6 @@ def main(page: ft.Page):
         bgcolor="#455A64",
         padding=10,
         border_radius=10,
-        scroll = ft.ScrollMode.AUTO
     )
 
     page.add(
