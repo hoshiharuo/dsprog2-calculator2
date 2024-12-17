@@ -1,5 +1,6 @@
 import flet as ft
 import requests
+import sqlite3
 
 WEATHER_CODES = {
     "100": {"name": "晴れ", "icon": ft.icons.WB_SUNNY},
@@ -129,7 +130,34 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
         ),
         elevation=0,  
     )
+def init_db():
+    conn = sqlite3.connect("weather.db")
+    c = conn.cursor()
 
+    # 地域テーブル
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS regions (
+        region_code TEXT PRIMARY KEY,
+        region_name TEXT
+    )
+    ''')
+
+    # 天気テーブル
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS forecasts (
+        region_code TEXT,
+        forecast_date TEXT,
+        weather_code TEXT,
+        min_temp REAL,
+        max_temp REAL,
+        PRIMARY KEY (region_code, forecast_date),
+        FOREIGN KEY (region_code) REFERENCES regions(region_code)
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+    
 def main(page: ft.Page):
     page.title = "天気予報アプリ"
     page.padding = 10
