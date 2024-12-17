@@ -260,7 +260,7 @@ def main(page: ft.Page):
                                 size=12
                             )
                         ], spacing=2),
-                        on_click=lambda e, code=sub_region: show_weather(code)
+                        on_click=lambda e, code=sub_region: show_weather_from_db(code)
                     )
                     for sub_region in region_info["children"]
                 ],
@@ -268,37 +268,31 @@ def main(page: ft.Page):
             sidebar.controls.append(region_tile)
         return sidebar
 
-    def show_weather(region_code):
-        weather_data = get_weather_data(region_code)
-        if not weather_data or len(weather_data) < 2:
+    def show_weather_from_db(region_code):
+        # DBにデータがなければAPIから取得しDB保存する
+        region_name, forecasts = get_forecasts_from_db(region_code)
+        if not forecasts:
+            # データなければ取得
+            weather_data = get_weather_data(region_code)
+            if weather_data:
+                store_weather_data_in_db(region_code, weather_data)
+                # 再取得
+                region_name, forecasts = get_forecasts_from_db(region_code)
+
+        if not forecasts:
             weather_grid.controls = [ft.Text("天気データの取得に失敗しました")]
-            # 地域名表示をクリア
             region_title.value = ""
             page.update()
             return
 
-        # 選択された地域名をregion_dataから取得
-        region_name = region_data["offices"].get(region_code, {}).get("name", "不明")
         region_title.value = region_name
 
-        forecasts = weather_data[1]["timeSeries"][0]
-        dates = forecasts["timeDefines"]
-        areas = forecasts["areas"]
-
-        area = areas[0]
-
-        temp_data = weather_data[1]["timeSeries"][1]
-        temp_area = temp_data["areas"][0]
-
         cards = []
-        for i in range(len(dates)):
-            max_temp = temp_area.get("tempsMax", [None])[i] if "tempsMax" in temp_area else None
-            min_temp = temp_area.get("tempsMin", [None])[i] if "tempsMin" in temp_area else None
-            
+        for (forecast_date, weather_code, min_temp, max_temp) in forecasts:
             cards.append(
                 create_weather_card(
-                    date=dates[i].split("T")[0],
-                    weather_code=area["weatherCodes"][i],
+                    date=forecast_date,
+                    weather_code=weather_code,
                     max_temp=max_temp,
                     min_temp=min_temp
                 )
