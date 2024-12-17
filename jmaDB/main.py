@@ -339,15 +339,6 @@ def main(page: ft.Page):
 
     right_area = ft.Column(
         [
-            ft.Row([region_title, date_dropdown], alignment=ft.MainAxisAlignment.START, spacing=20),
-            weather_grid,
-        ],
-        spacing=10,
-        expand=True
-    )
-
-    right_area = ft.Column(
-        [
             region_title,   
             weather_grid,   
         ],
