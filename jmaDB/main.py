@@ -56,7 +56,6 @@ def get_weather_data(region_code):
         print(f"その他のエラー (コード: {region_code}): {e}")
         return None
 
-# 天気カードを作成
 def create_weather_card(date, weather_code, max_temp, min_temp):
     weather_info = get_weather_info(weather_code)
     return ft.Card(
@@ -134,7 +133,6 @@ def init_db():
     conn = sqlite3.connect("weather.db")
     c = conn.cursor()
 
-    # 地域テーブル
     c.execute('''
     CREATE TABLE IF NOT EXISTS regions (
         region_code TEXT PRIMARY KEY,
@@ -142,7 +140,6 @@ def init_db():
     )
     ''')
 
-    # 天気テーブル
     c.execute('''
     CREATE TABLE IF NOT EXISTS forecasts (
         region_code TEXT,
@@ -151,10 +148,9 @@ def init_db():
         min_temp REAL,
         max_temp REAL,
         PRIMARY KEY (region_code, forecast_date),
-        FOREIGN KEY (region_code) REFERENCES regions(region_code)
+        FOREIGN KEY(region_code) REFERENCES regions(region_code)
     )
     ''')
-
     conn.commit()
     conn.close()
 
@@ -165,7 +161,6 @@ def store_region_data_in_db(region_data):
     conn = sqlite3.connect("weather.db")
     c = conn.cursor()
 
-    # officesキーに地域コードと名前が入っている
     for office_code, office_info in region_data["offices"].items():
         region_code = office_code
         region_name = office_info.get("name", "不明")
@@ -173,6 +168,7 @@ def store_region_data_in_db(region_data):
             INSERT OR IGNORE INTO regions (region_code, region_name)
             VALUES (?, ?)
         ''', (region_code, region_name))
+
     conn.commit()
     conn.close()
 
@@ -231,7 +227,6 @@ def main(page: ft.Page):
         page.add(ft.Text("地域データの取得に失敗しました"))
         return
 
-    # 地域名表示用テキスト
     region_title = ft.Text("", size=20, weight="bold")
 
     weather_grid = ft.GridView(
@@ -309,11 +304,11 @@ def main(page: ft.Page):
         border_radius=10,
     )
 
-    # 右側の表示エリアに地域名と天気グリッドを縦に並べる
+
     right_area = ft.Column(
         [
-            region_title,   # 地域名表示
-            weather_grid,   # 天気カード表示エリア
+            region_title,   
+            weather_grid,   
         ],
         spacing=10,
         expand=True
