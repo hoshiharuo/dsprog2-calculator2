@@ -236,6 +236,15 @@ def main(page: ft.Page):
         run_spacing=10,
     )
 
+    date_dropdown = ft.Dropdown(
+        on_change=lambda e: show_selected_date_forecast(),
+        options=[],
+        width=150
+    )
+
+    selected_region_code = None
+    all_forecasts = [] 
+
     def create_sidebar():
         sidebar = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
         for region_code, region_info in region_data["centers"].items():
