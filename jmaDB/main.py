@@ -273,27 +273,52 @@ def main(page: ft.Page):
         return sidebar
 
     def show_weather_from_db(region_code):
-        # DBにデータがなければAPIから取得しDB保存する
+        nonlocal selected_region_code, all_forecasts
+        selected_region_code = region_code
+
+        # DBからデータ取得
         region_name, forecasts = get_forecasts_from_db(region_code)
+
+        # データが無ければAPIから取得してDB格納
         if not forecasts:
-            # データなければ取得
             weather_data = get_weather_data(region_code)
             if weather_data:
                 store_weather_data_in_db(region_code, weather_data)
-                # 再取得
                 region_name, forecasts = get_forecasts_from_db(region_code)
 
         if not forecasts:
             weather_grid.controls = [ft.Text("天気データの取得に失敗しました")]
             region_title.value = ""
+            date_dropdown.options = []
+            date_dropdown.value = None
             page.update()
             return
 
         region_title.value = region_name
+        all_forecasts = forecasts
 
-        cards = []
-        for (forecast_date, weather_code, min_temp, max_temp) in forecasts:
-            cards.append(
+        # 日付ドロップダウン更新
+        # forecastsは[(forecast_date, weather_code, min_temp, max_temp), ...]
+        date_list = [f[0] for f in forecasts]
+        date_dropdown.options = [ft.dropdown.Option(date) for date in date_list]
+        date_dropdown.value = date_list[0] if date_list else None
+
+        # 初期表示用に最初の日付を表示
+        show_selected_date_forecast()
+
+    def show_selected_date_forecast():
+        weather_grid.controls = []
+        if not date_dropdown.value or not all_forecasts:
+            page.update()
+            return
+
+        # 選択された日付の予報を取得
+        selected_date = date_dropdown.value
+        selected_data = [f for f in all_forecasts if f[0] == selected_date]
+        # selected_dataは基本的に1つの日付につき1レコードだが、
+        # 将来的に複数レコードある場合も対応できるようループ
+        for forecast_date, weather_code, min_temp, max_temp in selected_data:
+            weather_grid.controls.append(
                 create_weather_card(
                     date=forecast_date,
                     weather_code=weather_code,
@@ -302,7 +327,6 @@ def main(page: ft.Page):
                 )
             )
 
-        weather_grid.controls = cards
         page.update()
 
     sidebar_container = ft.Container(
@@ -313,6 +337,14 @@ def main(page: ft.Page):
         border_radius=10,
     )
 
+    right_area = ft.Column(
+        [
+            ft.Row([region_title, date_dropdown], alignment=ft.MainAxisAlignment.START, spacing=20),
+            weather_grid,
+        ],
+        spacing=10,
+        expand=True
+    )
 
     right_area = ft.Column(
         [
