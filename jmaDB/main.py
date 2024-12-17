@@ -158,7 +158,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-    def store_region_data_in_db(region_data):
+def store_region_data_in_db(region_data):
     if not region_data:
         return
 
@@ -176,7 +176,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-    def store_weather_data_in_db(region_code, weather_data):
+def store_weather_data_in_db(region_code, weather_data):
     if not weather_data or len(weather_data) < 2:
         return
     conn = sqlite3.connect("weather.db")
@@ -204,7 +204,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-    def get_forecasts_from_db(region_code):
+def get_forecasts_from_db(region_code):
     conn = sqlite3.connect("weather.db")
     c = conn.cursor()
 
@@ -223,7 +223,10 @@ def main(page: ft.Page):
     page.padding = 10
     page.theme_mode = ft.ThemeMode.LIGHT
 
+    init_db()
     region_data = get_region_data()
+    store_region_data_in_db(region_data)
+
     if not region_data:
         page.add(ft.Text("地域データの取得に失敗しました"))
         return
