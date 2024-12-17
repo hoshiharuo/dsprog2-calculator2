@@ -213,6 +213,7 @@ def main(page: ft.Page):
         bgcolor="#455A64",
         padding=10,
         border_radius=10,
+        scroll = ft.ScrollMode.AUTO
     )
 
     page.add(
