@@ -37,7 +37,12 @@ def get_region_data():
 
 def get_weather_data(region_code):
     URL = f"https://www.jma.go.jp/bosai/forecast/data/forecast/{region_code}.json"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
     try:
+        response = requests.get(URL, headers=headers)
+        response.raise_for_status()
         weather_json = requests.get(URL).json()
         return weather_json
     except requests.exceptions.HTTPError as e:
