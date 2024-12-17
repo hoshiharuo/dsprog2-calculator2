@@ -57,7 +57,6 @@ def get_weather_data(region_code):
         print(f"その他のエラー (コード: {region_code}): {e}")
         return None
 
-# 天気カードを作成
 def create_weather_card(date, weather_code, max_temp, min_temp):
     weather_info = get_weather_info(weather_code)
     return ft.Card(
@@ -132,7 +131,6 @@ def create_weather_card(date, weather_code, max_temp, min_temp):
         elevation=0,  
     )
 
-# --- 変更ここから: DB初期化・格納用関数追加 ---
 def init_db():
     conn = sqlite3.connect("weather.db")
     c = conn.cursor()
@@ -168,7 +166,6 @@ def store_region_data_in_db(region_data):
     conn = sqlite3.connect("weather.db")
     c = conn.cursor()
 
-    # officesキーに地域コードと名前が入っている
     for office_code, office_info in region_data["offices"].items():
         region_code = office_code
         region_name = office_info.get("name", "不明")
@@ -220,24 +217,21 @@ def get_forecasts_from_db(region_code):
     conn.close()
 
     return region_name, forecasts
-# --- 変更ここまで ---
 
 def main(page: ft.Page):
     page.title = "天気予報アプリ"
     page.padding = 10
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # --- 変更ここから: DB初期化と地域データ投入 ---
     init_db()
     region_data = get_region_data()
     store_region_data_in_db(region_data)
-    # --- 変更ここまで ---
+
 
     if not region_data:
         page.add(ft.Text("地域データの取得に失敗しました"))
         return
-
-    # 地域名表示用テキスト
+    
     region_title = ft.Text("", size=20, weight="bold")
 
     weather_grid = ft.GridView(
@@ -266,9 +260,7 @@ def main(page: ft.Page):
                                 size=12
                             )
                         ], spacing=2),
-                        # --- 変更ここから: show_weatherからshow_weather_dbへ変更 ---
                         on_click=lambda e, code=sub_region: show_weather_from_db(code)
-                        # --- 変更ここまで ---
                     )
                     for sub_region in region_info["children"]
                 ],
@@ -276,16 +268,12 @@ def main(page: ft.Page):
             sidebar.controls.append(region_tile)
         return sidebar
 
-    # --- 変更ここから: DBから表示する関数を追加 ---
     def show_weather_from_db(region_code):
-        # DBにデータがなければAPIから取得しDB保存する
         region_name, forecasts = get_forecasts_from_db(region_code)
         if not forecasts:
-            # データなければ取得
             weather_data = get_weather_data(region_code)
             if weather_data:
                 store_weather_data_in_db(region_code, weather_data)
-                # 再取得
                 region_name, forecasts = get_forecasts_from_db(region_code)
 
         if not forecasts:
@@ -309,11 +297,7 @@ def main(page: ft.Page):
 
         weather_grid.controls = cards
         page.update()
-    # --- 変更ここまで ---
 
-    # 既存のshow_weatherは不要になるが、必要ならコメントアウトまたは削除可能
-    # def show_weather(region_code):
-    #     ...
 
     sidebar_container = ft.Container(
         content=create_sidebar(),
@@ -323,11 +307,10 @@ def main(page: ft.Page):
         border_radius=10,
     )
 
-    # 右側の表示エリアに地域名と天気グリッドを縦に並べる
     right_area = ft.Column(
         [
-            region_title,   # 地域名表示
-            weather_grid,   # 天気カード表示エリア
+            region_title,   
+            weather_grid,   
         ],
         spacing=10,
         expand=True
