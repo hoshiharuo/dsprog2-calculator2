@@ -204,6 +204,20 @@ def init_db():
     conn.commit()
     conn.close()
 
+    def get_forecasts_from_db(region_code):
+    conn = sqlite3.connect("weather.db")
+    c = conn.cursor()
+
+    c.execute('SELECT region_name FROM regions WHERE region_code = ?', (region_code,))
+    row = c.fetchone()
+    region_name = row[0] if row else "不明"
+
+    c.execute('SELECT forecast_date, weather_code, min_temp, max_temp FROM forecasts WHERE region_code = ? ORDER BY forecast_date', (region_code,))
+    forecasts = c.fetchall()
+    conn.close()
+
+    return region_name, forecasts
+
 def main(page: ft.Page):
     page.title = "天気予報アプリ"
     page.padding = 10
